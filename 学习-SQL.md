@@ -1,51 +1,5 @@
 # 学习 SQL
 
-```sql
-CREATE TABLE users (
-    id INT PRIMARY KEY,
-    name VARCHAR(50),
-    signup_date DATE
-);
-
-CREATE TABLE products (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    category VARCHAR(50),
-    price DECIMAL(10, 2)
-);
-
-CREATE TABLE orders (
-    id INT PRIMARY KEY,
-    user_id INT,
-    product_id INT,
-    quantity INT,
-    order_date DATE,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
-
--- 示例：插入 10000 个用户
-INSERT INTO users (id, name, signup_date)
-SELECT x, CONCAT('User_', x), DATEADD('DAY', -x % 365, CURRENT_DATE())
-FROM system_range(1, 10000);
-
--- 插入 100 个商品
-INSERT INTO products (id, name, category, price)
-SELECT 1000 + x, CONCAT('Product_', x), 
-       CASE WHEN x % 2 = 0 THEN 'Electronics' ELSE 'Furniture' END,
-       ROUND(RAND() * 1000, 2)
-FROM system_range(1, 100);
-
--- 插入 100000 个订单（用户随机、商品随机、数量 1-5）
-INSERT INTO orders (id, user_id, product_id, quantity, order_date)
-SELECT x, 
-       FLOOR(RAND() * 10000) + 1,
-       FLOOR(RAND() * 100) + 1001,
-       FLOOR(RAND() * 5) + 1,
-       DATEADD('DAY', -FLOOR(RAND() * 365), CURRENT_DATE())
-FROM system_range(1, 100000);
-```
-
 ## 学习目标：
 
 - 掌握 `SELECT`, `WHERE`, `GROUP BY`, `JOIN`, 子查询、窗口函数等核心语法
@@ -181,3 +135,52 @@ FROM system_range(1, 100000);
 | SQL 在线测试平台 | [Leetcode SQL](https://leetcode.com/problemset/database/)、[Mode SQL Tutorial](https://mode.com/sql-tutorial/) |
 | 可视化练习平台   | [Dune SQL Editor](https://dune.com/queries)（可练链上数据）  |
 | 中文题库         | [牛客 SQL 大厂题库](https://www.nowcoder.com/exam/oj?tab=SQL篇) |
+
+# 测试用数据库
+
+```sql
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    name VARCHAR(50),
+    signup_date DATE
+);
+
+CREATE TABLE products (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    category VARCHAR(50),
+    price DECIMAL(10, 2)
+);
+
+CREATE TABLE orders (
+    id INT PRIMARY KEY,
+    user_id INT,
+    product_id INT,
+    quantity INT,
+    order_date DATE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+-- 示例：插入 10000 个用户
+INSERT INTO users (id, name, signup_date)
+SELECT x, CONCAT('User_', x), DATEADD('DAY', -x % 365, CURRENT_DATE())
+FROM system_range(1, 10000);
+
+-- 插入 100 个商品
+INSERT INTO products (id, name, category, price)
+SELECT 1000 + x, CONCAT('Product_', x), 
+       CASE WHEN x % 2 = 0 THEN 'Electronics' ELSE 'Furniture' END,
+       ROUND(RAND() * 1000, 2)
+FROM system_range(1, 100);
+
+-- 插入 100000 个订单（用户随机、商品随机、数量 1-5）
+INSERT INTO orders (id, user_id, product_id, quantity, order_date)
+SELECT x, 
+       FLOOR(RAND() * 10000) + 1,
+       FLOOR(RAND() * 100) + 1001,
+       FLOOR(RAND() * 5) + 1,
+       DATEADD('DAY', -FLOOR(RAND() * 365), CURRENT_DATE())
+FROM system_range(1, 100000);
+```
+
