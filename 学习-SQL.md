@@ -1,4 +1,4 @@
-# 学习路径
+# 学习 SQL
 
 ```sql
 CREATE TABLE users (
@@ -45,10 +45,6 @@ SELECT x,
        DATEADD('DAY', -FLOOR(RAND() * 365), CURRENT_DATE())
 FROM system_range(1, 100000);
 ```
-
-
-
-## 一、SQL
 
 ## 学习目标：
 
