@@ -99,11 +99,74 @@
 
 ### 练习任务：
 
-1. 查询每个用户的首次下单记录。
-2. 计算每个用户的累计消费金额（按下单时间累加）
-3. 查询每个类别中价格排名前 3 的商品
-4. 找出每个用户最近一次购买的商品
-5. 统计每个用户下单次数的排名（总下单数多的排前）
+- 查询每个用户的首次下单记录。
+
+```sql
+SELECT *
+FROM (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY order_date) AS rn
+    FROM orders
+) AS ranked_orders
+WHERE rn = 1;
+```
+
+- 计算每个用户的累计消费金额（按下单时间累加）
+
+```sql
+SELECT 
+    o.user_id,
+    o.order_date,
+    p.price * o.quantity AS order_amount,
+    SUM(p.price * o.quantity) OVER (PARTITION BY o.user_id ORDER BY o.order_date) AS cumulative_amount
+FROM orders o
+JOIN products p ON o.product_id = p.id;
+```
+
+
+
+- 查询每个类别中价格排名前 3 的商品
+
+```sql
+SELECT *
+FROM (
+    SELECT *,
+           RANK() OVER (PARTITION BY category ORDER BY price DESC) AS rnk
+    FROM products
+) AS ranked_products
+WHERE rnk <= 3;
+```
+
+
+
+- 找出每个用户最近一次购买的商品
+
+```sql
+SELECT *
+FROM (
+    SELECT o.*, p.name AS product_name,
+           ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.order_date DESC) AS rn
+    FROM orders o
+    JOIN products p ON o.product_id = p.id
+) AS latest_orders
+WHERE rn = 1;
+```
+
+
+
+- 统计每个用户下单次数的排名（总下单数多的排前）
+
+```sql
+SELECT user_id, order_count,
+       RANK() OVER (ORDER BY order_count DESC) AS rank
+FROM (
+    SELECT user_id, COUNT(*) AS order_count
+    FROM orders
+    GROUP BY user_id
+) AS user_order_counts;
+```
+
+
 
 ------
 
