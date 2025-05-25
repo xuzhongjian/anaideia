@@ -132,32 +132,157 @@ print(topic0)
 ##### 方法 2：用在线工具
 
 - 打开 https://emn178.github.io/online-tools/keccak_256.html
+
 - 输入 `Transfer(address,address,uint256)`
+
 - 选择 `Keccak-256`
+
 - 得到哈希值（就是 `topics[0]`）
 
 ### 1. 查询某个代币的前 n 个发送地址
 
+  ```
+  0x4206931337dc273a630d328dA6441786BfaD668f
+  ```
+
+  - 事件：ERC20 `Transfer`
+  - 维度：`from` 地址、value
+  - 条件：特定 token 合约地址
+  - 按转账金额降序
+
+  ```sql
+  select sum(bytearray_to_uint256("data")) as total_amount, topic1
+  from ethereum.logs
+  where block_time >= CURRENT_DATE - INTERVAL '7' DAY
+  	and "contract_address" = 0x4206931337dc273a630d328dA6441786BfaD668f
+  	and topic0 = 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
+  group by topic1 
+  order by sum(bytearray_to_uint256("data")) desc
+  limit 10
+  ```
+
+  ```sql
+  select * from (
+      select
+          "topic1"
+          , sum(bytearray_to_uint256("data")) as total_amount
+      from ethereum.logs
+      where block_time >= CURRENT_DATE - INTERVAL '30' DAY
+         and "contract_address" = 0xdac17f958d2ee523a2206206994597c13d831ec7
+         and "topic0" = 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
+      group by
+          "topic1"
+  ) order by total_amount desc
+  ```
+
+  ### 2. 查询最近 7 天内，收到最多 USDT 转账的用户地址
+
+  ```
+  USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+  ```
+
+  ```sql
+  select topic2, sum(bytearray_to_uint256("data"))
+  from ethereum.logs
+  where block_time >= CURRENT_DATE - INTERVAL '7' DAY
+         and "contract_address" = 0xdAC17F958D2ee523a2206206994597C13D831ec7
+         and "topic0" = 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
+  group by topic2
+  order by sum(bytearray_to_uint256("data")) desc
+  limit 10
+  ```
+
+### 3. 查询某个永固地址发出的所有 ERC20 转账
+
 - 事件：ERC20 `Transfer`
-- 维度：`from` 地址、value
-- 条件：特定 token 合约地址
-- 按转账金额降序
+- 条件：`from` 为目标地址
+- 输出：合约地址（代币）、接收地址、转账金额、时间戳
 
-### 2. 查询某个地址收到最多转账的某个 ERC20 代币
+------
 
-- 汇总该地址为 `to` 的所有转账事件
-- Group by 合约地址
-- 按金额排序
+### 4. 统计 USDT 的活跃地址数（发送或接收）
 
-### 3. 追踪某个 NFT 合约中交易最活跃的地址
+```
+USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+```
 
-- 事件：ERC721 `Transfer`
-- 按交易次数分析买家/卖家地址出现频率
+- 事件：ERC20 `Transfer`
+- 条件：合约地址 = 目标 token
+- 提取唯一的 `from` 和 `to` 地址
+- 统计活跃地址数（`distinct`）
 
-### 4. 分析某个 NFT 合约的 mint 活动
+------
 
-- 识别 mint 时间、mint 地址、mint 数量等
-- from 为 0x0 的 Transfer 事件
+### 5. 查询最近 24 小时内 USDT 的总交易量（以转账金额衡量）
+
+```
+USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+```
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址 + 时间戳 > 24 小时前
+- 汇总 `value`
+
+------
+
+### 6. 查询 USDT 最频繁交易的地址（发起 + 接收总次数）
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址 = 目标 token
+- group by 地址（from 和 to 分别统计 + 合并）
+- 排序：总次数降序
+
+------
+
+### 7. USDT 在不同时间段的交易活跃度趋势
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址
+- group by 时间窗口（按小时/天）
+- 输出：每个时间段的交易次数 or 总交易金额
+
+------
+
+### 8. 统计 USDT 的“鲸鱼地址”（持有或发送金额 > 阈值）
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址
+- 汇总每个地址的发送 + 接收金额
+- 过滤金额 > 某个高阈值（如 1M tokens）
+
+------
+
+### 9. 查询首次收到 USDT 的地址列表及时间
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址
+- group by `to` 地址，取最早时间戳的一次
+
+------
+
+### 10. 统计某个用户地址参与最多的代币（发送+接收次数）
+
+- 事件：ERC20 `Transfer`
+- 条件：`from = address` 或 `to = address`
+- group by 合约地址
+- 统计次数（或金额）并排序
+
+------
+
+### 11. 查询 USDT 的大额转账记录（如超过 1M）
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址 + `value > 阈值`
+- 输出：from、to、value、block time
+
+------
+
+### 12. USDT 的“合约与非合约地址”交互分析
+
+- 事件：ERC20 `Transfer`
+- 条件：合约地址
+- 判断 `from` 或 `to` 是否为合约（需要结合 `code size`）
+- 分类统计：合约地址 vs 普通地址 的交互数量、金额
 
 ## 三、Uniswap 相关事件分析
 
