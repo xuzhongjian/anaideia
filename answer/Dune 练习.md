@@ -116,13 +116,36 @@ order by count(1) desc
 
 ------
 
-### 7. 分析某地址在高峰期的转账活动
+### 7. 分析某地址每天的高峰期时段
 
 - 表：`ethereum.transactions`
 - 条件：`from = '0x...' OR to = '0x...'`
-- 操作：筛选特定时间段内的交易
-- 目标：找出高峰期的交易数量和总金额
+- 目标：找出什么时候是高峰期，并求交易数量和总金额
 - 可筛选时间范围，例如最近 7 天
+
+```sql
+with new_table as (
+  select 
+    *,
+    hour(block_time) AS hour
+  from
+    ethereum.transactions
+  where
+    (
+        "from" = 0xb5d85cbf7cb3ee0d56b3bb207d5fc4b82f43f511 
+        or "to" = 0xb5d85cbf7cb3ee0d56b3bb207d5fc4b82f43f511
+    )
+    and "value" > 0
+    and block_time >= CURRENT_DATE - interval '7' day
+) 
+select
+  hour,
+  count(1) as times,
+  sum("value") total_value
+from new_table 
+group by hour
+order by count(1)
+```
 
 ------
 
@@ -133,6 +156,43 @@ order by count(1) desc
 - 目标：找出频繁发生这种操作的地址对
 - 可筛选时间范围，例如最近 30 天
 
+```SQL
+WITH recent_transactions AS (
+  SELECT
+    "from" as from_address,  
+    "to" as to_address,
+    block_time
+  FROM ethereum.transactions
+  WHERE block_time >= NOW() - INTERVAL '30 days'
+  AND "value" > 0
+),
+
+loops AS (
+  SELECT
+    t1.from_address AS addr_a,
+    t1.to_address AS addr_b,
+    t1.block_time AS time_ab,
+    t2.block_time AS time_ba
+  FROM recent_transactions t1
+  JOIN recent_transactions t2
+    ON t1.from_address = t2.to_address
+   AND t1.to_address = t2.from_address
+   AND t1.block_time < t2.block_time
+   AND t2.block_time <= t1.block_time + INTERVAL '1 day' -- 可调整这个闭环发生的最大时间差
+)
+
+SELECT
+  addr_a,
+  addr_b,
+  COUNT(*) AS loop_count,
+  MIN(time_ab) AS first_seen,
+  MAX(time_ba) AS last_seen
+FROM loops
+GROUP BY addr_a, addr_b
+HAVING COUNT(*) > 1
+ORDER BY loop_count DESC;
+```
+
 ------
 
 ### 9. 识别大额地址
@@ -141,6 +201,44 @@ order by count(1) desc
 - 操作：分别统计地址的总收入和支出，计算其净变化
 - 目标：筛选出净变化大于阈值的地址（如 1000 ETH）
 - 可筛选时间范围，例如最近 30 天
+
+```sql
+with total_in as (
+    select
+        "to"
+        , sum("value") / 1e18 as total_in_amount
+        from ethereum.transactions
+        where block_time >= CURRENT_DATE - INTERVAL '30' DAY
+   and "value" > 0
+        group by
+    "to"
+)
+        , total_out as (
+        select
+        "from"
+        , sum("value") / 1e18 as total_out_amount
+        from ethereum.transactions
+        where block_time >= CURRENT_DATE - INTERVAL '30' DAY
+   and "value" > 0
+        group by
+    "from"
+)
+        , delta as (
+        select
+        *
+        , if(total_in_amount is null, 0, total_in_amount) - if(total_out_amount is null, 0, total_out_amount) as delta_amount
+        from total_in
+            full join total_out on total_in."to" = total_out."from"
+)
+select
+    *
+from delta
+order by
+    delta_amount desc
+limit 1000
+```
+
+
 
 ## 二、ERC20 类事件分析
 
