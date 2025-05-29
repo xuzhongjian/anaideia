@@ -286,13 +286,85 @@ USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
 
 ## 三、Uniswap 相关事件分析
 
-1. 查询某个地址在 Uniswap 上的 swap 总金额
-   - 事件：`Swap`
-   - 合约地址过滤为特定的池子或路由器
-2. 统计每天的 Uniswap 总交易数量或总交易额
-   - 按时间聚合 `Swap` 事件
-3. 查找 Uniswap 上最频繁被 swap 的 token（按交易次数）
-   - 分析 tokenIn/tokenOut 的合约地址频率
+### 实现提示
+
+```sql
+-- 示例：查询 USDC/WETH 交易对的交易记录
+SELECT 
+    tx_hash,
+    block_timestamp,
+    "from" as trader,
+    amount0In, amount0Out,
+    amount1In, amount1Out
+FROM ethereum_logs 
+WHERE contract_address = '0xB4e16d0168e52d35CacdBe35Da4b227fa2bC9F0c'
+  AND topic0 = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822' -- Swap事件
+  AND block_timestamp >= '2024-01-01'
+ORDER BY block_timestamp DESC
+```
+
+具体可以参考 分析文档 中的代码模版。
+
+### 1. 查询某个交易对的所有交易记录
+
+- **事件**: `Swap`
+- **条件**: 指定 pair 合约地址
+- **输出**: 交易哈希、发起地址、token0/token1 数量变化、时间戳
+- **示例地址**: USDC/WETH pair: `0xB4e16d0168e52d35CacdBe35Da4b227fa2bC9F0c`
+
+### 2. 统计某个交易对的日交易量
+- **事件**: `Swap`
+- **条件**: 指定 pair 和时间范围
+- **计算**: 按日期聚合 amount0In/Out 和 amount1In/Out
+- **输出**: 日期、token0 交易量、token1 交易量、交易次数
+
+### 3. 分析流动性提供者行为 [⭐️]
+- **事件**: `Mint` (添加流动性) 和 `Burn` (移除流动性)
+- **条件**: 特定交易对或特定地址
+- **分析维度**:
+  - LP 持有时长分布
+  - 添加/移除流动性的金额分布
+  - 活跃 LP 地址数量变化趋势
+
+### 4. 套利机器人识别与分析 [⭐️]
+- **事件**: `Swap`
+- **识别条件**:
+  - 同一交易中多次 swap
+  - 短时间内反向交易
+  - MEV 特征（sandwich attack）
+- **输出**: 疑似套利地址、套利频次、估算收益
+
+### 5. 价格影响分析 [⭐️]
+- **事件**: `Swap` + `Sync`
+- **计算**: 
+  - 大额交易对价格的冲击
+  - 滑点分析
+  - 价格恢复时间
+- **输出**: 交易金额 vs 价格影响关系图
+
+### 6. Uniswap V2 TVL 变化追踪 [⭐️⭐️]
+- **事件**: `Mint`, `Burn`, `Swap`
+- **数据源**: 多个主要交易对
+- **计算**:
+  - 实时 TVL 计算
+  - 按交易对分解 TVL 占比
+  - TVL 与交易量相关性分析
+
+### 7. 代币价格发现分析 [⭐️⭐️]
+- **目标**: 新代币首次在 Uniswap 上市后的价格走势
+- **事件**: `PairCreated`, `Mint`, `Swap`
+- **分析**:
+  - 初始流动性规模
+  - 早期交易者行为
+  - 价格波动率变化
+  - 与 CEX 价格对比（如适用）
+
+### 8. 无常损失实证分析  [⭐️⭐️]
+- **数据**: LP 的完整生命周期（Mint 到 Burn）
+- **计算**:
+  - 实际 LP 收益 vs Hold 策略收益
+  - 不同价格波动幅度下的无常损失
+  - 手续费收入补偿效果
 
 ------
 
